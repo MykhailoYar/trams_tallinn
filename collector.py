@@ -1,70 +1,62 @@
 import re
-from selenium import webdriver
 import time
 
-from bs4 import BeautifulSoup
 import xlsxwriter
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 
-workbook = xlsxwriter.Workbook(
-    'C:/Users/mykhailo.yaroshenko/Desktop/Develop/1 - Python projects/Tramlines/test.xlsx')
+# basic url for each route
+route_urls = [f"https://transport.tallinn.ee/#tram/{route}/a-b" for route in range(1, 6)]
+
+# file for saving tram data
+workbook = xlsxwriter.Workbook('/Users/mykhailoyaroshenko/Desktop/trams_tallinn/test.xlsx')
+
+# constants
 format_num = workbook.add_format({'num_format': '0.000'})
 format_time = workbook.add_format({'num_format': 'hh:mm'})
 
-all_stations=dict()
+all_stations = dict()
+for ur in route_urls:
 
-url=["https://transport.tallinn.ee/#tram/1/a-b",
-     "https://transport.tallinn.ee/#tram/2/a-b",
-     "https://transport.tallinn.ee/#tram/3/a-b",
-     "https://transport.tallinn.ee/#tram/4/a-b"]
-for ur in range(0,len(url)):
-
+    # open basic url
     driver = webdriver.Chrome()
-    driver.get(url[ur])
+    driver.get(ur)
     driver.minimize_window()
 
-    # loading the poge
+    # loading the page
     time.sleep(4)
 
     # name of the direction from left and right side
-    element2 = driver.find_element_by_id("divScheduleHeader")
-    direction=element2.text
+    element2 = driver.find_element("id", "divScheduleHeader")
+    direction = element2.text
     directions = re.split('\n', direction)
 
     # all station from left
-    element2 = driver.find_element_by_id("divScheduleLeft")
-    stops_left=element2.text
-    stops_left_list=re.split('\n',stops_left)
-    links_left=[]
+    element2 = driver.find_element("id", "divScheduleLeft")
+    stops_left = element2.text
+    stops_left_list = re.split('\n', stops_left)
 
     # all station from right
-    element2 = driver.find_element_by_id("divScheduleRight")
-    stops_right=element2.text
-    stops_right_list=re.split('\n',stops_right)
-    links_right=[]
+    element2 = driver.find_element("id", "divScheduleRight")
+    stops_right = element2.text
+    stops_right_list = re.split('\n', stops_right)
 
-    stops_all = stops_left_list+ stops_right_list
+    stops_all = stops_left_list + stops_right_list
+    list_set, unique_list = set(stops_all), (list(stops_all))
+    dir_left, dir_right = {'Direction': directions[0]}, {'Direction': directions[1]}
 
-
-    list_set = set(stops_all)
-    unique_list = (list(stops_all))
-
-    dir_left={'Direction':directions[0]}
-    dir_right={'Direction':directions[1]}
-
-    for i in range(0,len(unique_list)):
-        continue_link2 = driver.find_elements_by_partial_link_text(unique_list[i])
-        for i2 in range(0,len(continue_link2)):
-            a = str(continue_link2[i2].get_attribute('href'))
-            al = re.split('/', a)
-            if len(al)>1:
-                if al[5]=='a-b':
-                    dir_left[unique_list[i]]=a
+    for station in unique_list:
+        continue_link2 = driver.find_elements(By.LINK_TEXT, station)
+        for cl in continue_link2:
+            link = str(cl.get_attribute('href'))
+            if link:
+                if 'a-b' in link:
+                    dir_left[station] = link
                 else:
-                    dir_right[unique_list[i]]=a
+                    dir_right[station] = link
 
     driver.close()
 
-    # all_links_dir=[]
     for i in unique_list:
             l = []
             if i in dir_left.keys():
@@ -77,130 +69,92 @@ for ur in range(0,len(url)):
                 l.append('')
 
             if i in all_stations.keys():
-
                 addlist = all_stations[i]
-                addlist[directions[0]]=l[0]
+                addlist[directions[0]] = l[0]
                 addlist[directions[1]] = l[1]
-                all_stations[i]=addlist
+                all_stations[i] = addlist
             else:
                 all_stations[i] = {directions[0]: l[0], directions[1]: l[1]}
 
-            # all_links_dir.append(l)
-
-# for i in all_stations['Hobujaama']:
-#     for j in i.keys():
-#         print(j,i[j])
-
-    #
-    #
-
-all_links=0
+all_links = 0
 for i in all_stations.values():
-    all_links+=1
+    all_links += 1
 
 N = 0
 
-
 for stop in all_stations.keys():
-    rows_st = 5
-    rows_fn = 29
-    print(round(N/all_links*100,1))
+    rows_st, rows_fn = 5, 29
+    print(round(N/all_links*100, 1))
 
-    worksheet = workbook.add_worksheet(stop)
-    # print(stop)
-    dirlink=all_stations[stop]
+    worksheet, dirlink = workbook.add_worksheet(stop), all_stations[stop]
+
     for direct in dirlink.keys():
 
-        rows=[rows_st, rows_fn]
+        rows = [rows_st, rows_fn]
         worksheet.write(0, 0, 'Station:')
-        worksheet.write(0,1,stop)
+        worksheet.write(0, 1, stop)
         worksheet.write(rows_st-2, 0, 'Direction:')
-        worksheet.write(rows_st-2, 1,direct)
+        worksheet.write(rows_st-2, 1, direct)
         worksheet.write(rows_st - 1, 1, 'Monday-Friday')
         worksheet.write(rows_st - 1, 13, 'Saturday')
         worksheet.write(rows_st - 1, 24, 'Sunday and public holiday')
 
-        r0 = 1
-        h_tab=[]
-        for r in range(rows_st,rows_fn):
+        r0, h_tab = 1, []
+        for r in range(rows_st, rows_fn):
             worksheet.write(r, 0, r0)
             h_tab.append(r0)
-            r0 +=1
+            r0 += 1
 
         worksheet.write(r, 0, 0)
         h_tab.append(0)
 
-        link=dirlink[direct]
+        link = dirlink[direct]
 
-
-        # print(direct)
-
-
-
-        if len(link)>0:
-            # print(link)
+        if len(link) > 0:
             worksheet.write(rows_st-2, 5, 'Link')
             worksheet.write(rows_st-2, 6, link)
 
-            numb = re.split('/',link)
+            numb = re.split('/', link)
             numb = list(numb[4])
-            numbr=numb[0]
-
-            # print(numbr)
 
             driver = webdriver.Chrome()
             driver.get(link)
             driver.minimize_window()
 
-            # loading the poge
+            # loading the page
             time.sleep(2)
+
             # full timetable
-            element2 = driver.find_element_by_id("divScheduleContentInner")
+            element2 = driver.find_element("id", "divScheduleContentInner")
             timetable = element2.text
             timetable_list = re.split('\n', timetable)
-
             driver.close()
 
-            time_int = []
-            time_all=[]
-            h0 = 1
-            int0 = [timetable_list.index('Tööpäev'),timetable_list.index('Laupäev'),
-                    timetable_list.index('Pühapäev ja riiklik püha') ]
+            time_int, time_all, h0 = [], [], 1
+            int0 = [timetable_list.index('Tööpäev'), timetable_list.index('Laupäev,'),
+                    timetable_list.index('Pühapäev ja riiklik püha')]
             for i2 in timetable_list:
-                # try:
-                timetable_dig = re.split(' ', i2)
-                if i2 not in int0 and len(timetable_dig)==2:
+                timetable_dig = i2.split()
 
-                    # if timetable_list.index(i2)==int2:
-                    #     time_all.append(time_int)
-                    #     time_int = []
+                if i2 not in int0 and len(timetable_dig) == 2:
 
-                    x=list(timetable_dig[1])
-                    for i3 in range(0,len(x),2):
-                        x2=x[i3]+x[i3+1]
+                    x = list(timetable_dig[1])
+                    for i3 in range(0, len(x), 2):
+                        x2 = x[i3] + x[i3+1]
                         time_int.append(timetable_dig[0]+':'+x2)
                 else:
                     time_all.append(time_int)
-                    time_int=[]
-                # except:
-                #     None
+                    time_int = []
 
             time_all.append(time_int)
-            lendat=[]
-            time_sap=[]
-            len_all=[]
+            lendat, time_sap, len_all = [], [], []
             for i in time_all:
-                if len(i)>0:
+                if len(i) > 0:
                     lendat.append(len(i))
-                    h0 = 5
-                    time_h = []
-                    time_h_temp = []
-                    k=1
+                    h0, time_h, time_h_temp, k = 5, [], [], 1
                     for i2 in i:
-                        c = re.split(':', i2)
-                        # print(c)
-                        h = int(c[0])
-                        if h!=h0:
+                        h = int(i2.split(':')[0])
+                        if h != h0:
                             time_h.append(time_h_temp)
                             time_h_temp = []
                             h0 = h
@@ -210,34 +164,28 @@ for stop in all_stations.keys():
                     time_sap.append(time_h)
                     len_all.append(lendat)
 
-            head=['Monday-Friday','Saturday','Holidays']
-            k = 0
-            # print(len(time_sap))
-            col = [1, 13, 24]
+            head = ['Monday-Friday', 'Saturday', 'Holidays']
+            k, col = 0, [1, 13, 24]
+
             for i in time_sap:
-                # print(head[k])
-                # print('**'*20)
 
                 for i2 in i:
                     cols = col[k]
                     for i3 in i2:
-                        h=re.split(':',i3)
-                        h0 = int(h[0])
+                        h0 = int(i3.split(':')[0])
                         x = h_tab.index(h0)
-                        if h0!=0:
+                        if h0 != 0:
                             worksheet.write(rows_st+x, cols, i3, format_time)
                         else:
                             worksheet.write(rows_st + x-1, cols, i3, format_time)
-                        cols +=1
-                k +=1
+                        cols += 1
+                k += 1
 
             for r in range(rows_st, rows_fn):
                 worksheet.write(r, 35, stop)
                 worksheet.write(r, 36, direct)
-            rows_st+=31
-            rows_fn+=31
-    # workbook.close()
+            rows_st += 31
+            rows_fn += 31
+    N += 1
 
-    # input('wait function')
-    N+=1
 workbook.close()
