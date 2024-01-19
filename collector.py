@@ -114,7 +114,7 @@ for stop in all_stations.keys():
             worksheet.write(rows_st-2, 5, 'Link')
             worksheet.write(rows_st-2, 6, link)
 
-            numb = re.split('/', link)
+            numb = link.split('/')
             numb = list(numb[4])
 
             driver = webdriver.Chrome()
